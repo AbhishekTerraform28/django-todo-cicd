@@ -1,0 +1,12 @@
+kind: Service
+apiVersion: v1
+metadata:
+  name: kube-svc
+  namespace: kube
+spec:
+  selector:
+    app: todoapp
+  ports:
+    - protocol: TCP
+      targetPort: 8000
+      port: 8000
