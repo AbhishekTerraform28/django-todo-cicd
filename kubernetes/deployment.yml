@@ -1,0 +1,22 @@
+kind: Deployment
+apiVersion: apps/v1
+metadata:
+  name: kube-deployment
+  namespace: kube
+  labels:
+    app: todoapp
+spec:
+  replicas: 2
+  selector:
+    matchLabels:
+      app: todoapp
+  template:
+    metadata:
+      labels:
+        app: todoapp
+    spec:
+      containers:
+      - name: kube-pod
+        image: swayamnakshane/todoapp
+        ports:
+          - containerPort: 8000
