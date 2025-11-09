@@ -1,24 +1,26 @@
-# 1️⃣ Base image
-FROM python:3.10-slim
+# Use full Python image instead of slim to avoid missing core packages
+FROM python:3.10
 
-# 2️⃣ Set working directory
+# Set work directory
 WORKDIR /data
 
-# 3️⃣ Copy requirement file first (better caching)
+# Copy requirement file first
 COPY requirements.txt .
 
-# 4️⃣ Install dependencies (and fix distutils issue)
-RUN apt-get update && apt-get install -y python3-distutils && \
-    pip install --no-cache-dir -r requirements.txt
+# Install dependencies cleanly
+RUN apt-get update && apt-get install -y --no-install-recommends gcc && \
+    pip install --upgrade pip setuptools wheel && \
+    pip install -r requirements.txt && \
+    apt-get clean && rm -rf /var/lib/apt/lists/*
 
-# 5️⃣ Copy rest of the project
+# Copy rest of the code
 COPY . .
 
-# 6️⃣ Run migrations
-RUN python manage.py migrate
+# Run Django migrations
+RUN python manage.py migrate || true
 
-# 7️⃣ Expose Django default port
+# Expose port 8000 for the app
 EXPOSE 8000
 
-# 8️⃣ Run the app
+# Start the Django server
 CMD ["python", "manage.py", "runserver", "0.0.0.0:8000"]
