@@ -10,8 +10,7 @@ spec:
   containers:
   - name: python
     image: python:3.10-slim
-    command:
-    - cat
+    command: ['cat']
     tty: true
 """
         }
@@ -29,9 +28,9 @@ spec:
             steps {
                 container('python') {
                     sh '''
-                        python --version
-                        pip install --upgrade pip
-                        pip install -r requirements.txt
+                      cd todoApp
+                      pip install --upgrade pip
+                      pip install -r requirements.txt
                     '''
                 }
             }
@@ -41,7 +40,8 @@ spec:
             steps {
                 container('python') {
                     sh '''
-                        python manage.py migrate
+                      cd todoApp
+                      python manage.py migrate
                     '''
                 }
             }
@@ -51,7 +51,8 @@ spec:
             steps {
                 container('python') {
                     sh '''
-                        python manage.py test || echo "No tests found"
+                      cd todoApp
+                      python manage.py test || echo "No tests found"
                     '''
                 }
             }
@@ -61,7 +62,8 @@ spec:
             steps {
                 container('python') {
                     sh '''
-                        python manage.py runserver 0.0.0.0:8000 & sleep 10
+                      cd todoApp
+                      python manage.py runserver 0.0.0.0:8000 &
                     '''
                 }
             }
