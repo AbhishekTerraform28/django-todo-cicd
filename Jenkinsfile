@@ -28,7 +28,7 @@ spec:
             steps {
                 container('python') {
                     sh '''
-                      cd todoApp
+                      python --version
                       pip install --upgrade pip
                       pip install -r requirements.txt
                     '''
@@ -64,6 +64,7 @@ spec:
                     sh '''
                       cd todoApp
                       python manage.py runserver 0.0.0.0:8000 &
+                      sleep 5
                     '''
                 }
             }
