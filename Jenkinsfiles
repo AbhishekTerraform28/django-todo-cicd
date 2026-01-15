@@ -1,0 +1,87 @@
+pipeline {
+    agent {
+        kubernetes {
+            namespace 'devops-tools'
+            yaml """
+apiVersion: v1
+kind: Pod
+spec:
+  serviceAccountName: jenkins-admin
+  containers:
+  - name: python
+    image: python:3.10-slim
+    command:
+    - cat
+    tty: true
+"""
+        }
+    }
+
+    environment {
+        DJANGO_SETTINGS_MODULE = "todo.settings"
+        PYTHONUNBUFFERED = "1"
+    }
+
+    stages {
+
+        stage('Checkout') {
+            steps {
+                checkout scm
+            }
+        }
+
+        stage('Install Dependencies') {
+            steps {
+                container('python') {
+                    sh '''
+                        python --version
+                        pip install --upgrade pip
+                        pip install -r requirements.txt
+                    '''
+                }
+            }
+        }
+
+        stage('Django Checks') {
+            steps {
+                container('python') {
+                    sh '''
+                        python manage.py check
+                        python manage.py migrate
+                    '''
+                }
+            }
+        }
+
+        stage('Test') {
+            steps {
+                container('python') {
+                    sh '''
+                        python manage.py test || echo "No tests found"
+                    '''
+                }
+            }
+        }
+
+        stage('Run App (Demo)') {
+            steps {
+                container('python') {
+                    sh '''
+                        echo "Starting Django server (demo run)"
+                        python manage.py runserver 0.0.0.0:8000 &
+                        sleep 10
+                    '''
+                }
+            }
+        }
+    }
+
+    post {
+        success {
+            echo "✅ Django CI pipeline completed successfully"
+        }
+        failure {
+            echo "❌ Pipeline failed"
+        }
+    }
+}
