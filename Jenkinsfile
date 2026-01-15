@@ -30,7 +30,7 @@ spec:
                     sh '''
                         python --version
                         pip install --upgrade pip
-                        pip install -r ./requirements.txt
+                        pip install -r requirements.txt
                     '''
                 }
             }
@@ -40,7 +40,6 @@ spec:
             steps {
                 container('python') {
                     sh '''
-                        cd todoApp
                         python manage.py migrate
                     '''
                 }
@@ -51,7 +50,6 @@ spec:
             steps {
                 container('python') {
                     sh '''
-                        cd todoApp
                         python manage.py test || echo "No tests found"
                     '''
                 }
@@ -62,7 +60,6 @@ spec:
             steps {
                 container('python') {
                     sh '''
-                        cd todoApp
                         python manage.py runserver 0.0.0.0:8000 &
                         sleep 5
                     '''
