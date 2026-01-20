@@ -2,47 +2,20 @@ pipeline {
   agent {
     kubernetes {
       namespace 'devops-tools'
-      defaultContainer 'jnlp'
+      defaultContainer 'python'
       yaml """
 apiVersion: v1
 kind: Pod
 spec:
   serviceAccountName: jenkins-admin
-  hostNetwork: true
   containers:
-  - name: maven
-    image: maven:3.9.6-eclipse-temurin-17
-    command:
-    - cat
-    tty: true
-
-  - name: test
-    image: maven:3.9.6-eclipse-temurin-17
-    command:
-    - cat
-    tty: true
-
-  - name: buildah
-    image: quay.io/buildah/stable:latest
-    securityContext:
-      privileged: true
-      runAsUser: 0
-    command:
-    - cat
-    tty: true
-
-  - name: kubectl
-    image: bitnami/kubectl:latest
+  - name: python
+    image: python:3.10-slim
     command:
     - cat
     tty: true
 """
     }
-  }
-
-  environment {
-    AWS_REGION = 'ap-south-1'
-    IMAGE_NAME = 'myapp'
   }
 
   stages {
@@ -53,69 +26,47 @@ spec:
       }
     }
 
-    stage('Build') {
+    stage('Install Dependencies') {
       steps {
-        container('maven') {
+        container('python') {
           sh '''
-            mvn clean package -DskipTests
-          '''
-          stash includes: '**/target/*.jar', name: 'jar'
-        }
-      }
-    }
-
-    stage('Test') {
-      steps {
-        container('test') {
-          sh '''
-            mvn test || echo "No tests configured"
+            python --version
+            pip install --upgrade pip
+            pip install -r requirements.txt
           '''
         }
       }
     }
 
-    stage('Build & Push Image') {
+    stage('Migrate Database') {
       steps {
-        container('buildah') {
-          withCredentials([
-            [$class: 'AmazonWebServicesCredentialsBinding', credentialsId: 'aws_credentials'],
-            string(credentialsId: 'ECR_REGISTRY', variable: 'ECR_REGISTRY'),
-            string(credentialsId: 'ECR_REPO', variable: 'ECR_REPO')
-          ]) {
-            sh '''
-              aws configure set aws_access_key_id $AWS_ACCESS_KEY_ID
-              aws configure set aws_secret_access_key $AWS_SECRET_ACCESS_KEY
-              aws configure set region $AWS_REGION
-
-              aws ecr get-login-password --region $AWS_REGION \
-                | buildah login --username AWS --password-stdin $ECR_REGISTRY
-
-              unstash jar
-              buildah bud -t $IMAGE_NAME .
-              buildah tag $IMAGE_NAME $ECR_REGISTRY/$ECR_REPO:${BUILD_NUMBER}
-              buildah push $ECR_REGISTRY/$ECR_REPO:${BUILD_NUMBER}
-            '''
-          }
+        container('python') {
+          sh 'python manage.py migrate'
         }
       }
     }
 
-    stage('Deploy to Kubernetes') {
+    stage('Run Tests') {
       steps {
-        container('kubectl') {
-          sh '''
-            sed -i "s/:latest/:${BUILD_NUMBER}/g" deployment.yaml
-            kubectl apply -f deployment.yaml
-            kubectl rollout status deployment myapp
-          '''
+        container('python') {
+          sh 'python manage.py test || echo "No tests found"'
         }
       }
     }
+
+    stage('Collect Static (optional)') {
+      steps {
+        container('python') {
+          sh 'python manage.py collectstatic --noinput || true'
+        }
+      }
+    }
+
   }
 
   post {
     success {
-      echo "✅ CI/CD Pipeline completed successfully"
+      echo "✅ Django CI pipeline completed successfully"
     }
     failure {
       echo "❌ Pipeline failed"
