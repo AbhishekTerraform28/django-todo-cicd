@@ -8,12 +8,35 @@ kind: Pod
 spec:
   serviceAccountName: jenkins-admin
   containers:
-  - name: python
-    image: python:3.10-slim
+  - name: node
+    image: node:18-alpine
     command: ['cat']
     tty: true
+
+  - name: docker
+    image: docker:24.0
+    command: ['cat']
+    tty: true
+    volumeMounts:
+    - name: docker-sock
+      mountPath: /var/run/docker.sock
+
+  - name: kubectl
+    image: bitnami/kubectl:latest
+    command: ['cat']
+    tty: true
+
+  volumes:
+  - name: docker-sock
+    hostPath:
+      path: /var/run/docker.sock
 """
         }
+    }
+
+    environment {
+        IMAGE_NAME = "akshataujawane/my-node-app"
+        IMAGE_TAG  = "v1"
     }
 
     stages {
@@ -26,45 +49,53 @@ spec:
 
         stage('Install Dependencies') {
             steps {
-                container('python') {
-                    sh '''
-                      python --version
-                      pip install --upgrade pip
-                      pip install -r requirements.txt
-                    '''
-                }
-            }
-        }
-
-        stage('Migrate DB') {
-            steps {
-                container('python') {
-                    sh '''
-                      cd todoApp
-                      python manage.py migrate
-                    '''
+                container('node') {
+                    sh 'npm install'
                 }
             }
         }
 
         stage('Test') {
             steps {
-                container('python') {
+                container('node') {
+                    sh 'npm test || echo "No tests found"'
+                }
+            }
+        }
+
+        stage('Build Docker Image') {
+            steps {
+                container('docker') {
                     sh '''
-                      cd todoApp
-                      python manage.py test || echo "No tests found"
+                      docker build -t $IMAGE_NAME:$IMAGE_TAG .
                     '''
                 }
             }
         }
 
-        stage('Run App') {
+        stage('Push Docker Image') {
             steps {
-                container('python') {
+                container('docker') {
+                    withCredentials([usernamePassword(
+                        credentialsId: 'dockerhub-creds',
+                        usernameVariable: 'DOCKER_USER',
+                        passwordVariable: 'DOCKER_PASS'
+                    )]) {
+                        sh '''
+                          echo $DOCKER_PASS | docker login -u $DOCKER_USER --password-stdin
+                          docker push $IMAGE_NAME:$IMAGE_TAG
+                        '''
+                    }
+                }
+            }
+        }
+
+        stage('Deploy to Kubernetes') {
+            steps {
+                container('kubectl') {
                     sh '''
-                      cd todoApp
-                      python manage.py runserver 0.0.0.0:8000 &
-                      sleep 5
+                      kubectl apply -f k8s/deployment.yaml
+                      kubectl apply -f k8s/service.yaml
                     '''
                 }
             }
