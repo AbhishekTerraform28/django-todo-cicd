@@ -1,9 +1,8 @@
 pipeline {
-  agent {
-    kubernetes {
-      namespace 'devops-tools'
-      defaultContainer 'python'
-      yaml """
+    agent {
+        kubernetes {
+            namespace 'devops-tools'
+            yaml """
 apiVersion: v1
 kind: Pod
 spec:
@@ -11,65 +10,64 @@ spec:
   containers:
   - name: python
     image: python:3.10-slim
-    command:
-    - cat
+    command: ['cat']
     tty: true
 """
-    }
-  }
-
-  stages {
-
-    stage('Checkout') {
-      steps {
-        checkout scm
-      }
-    }
-
-    stage('Install Dependencies') {
-      steps {
-        container('python') {
-          sh '''
-            python --version
-            pip install --upgrade pip
-            pip install -r requirements.txt
-          '''
         }
-      }
     }
 
-    stage('Migrate Database') {
-      steps {
-        container('python') {
-          sh 'python manage.py migrate'
+    stages {
+
+        stage('Checkout') {
+            steps {
+                checkout scm
+            }
         }
-      }
-    }
 
-    stage('Run Tests') {
-      steps {
-        container('python') {
-          sh 'python manage.py test || echo "No tests found"'
+        stage('Install Dependencies') {
+            steps {
+                container('python') {
+                    sh '''
+                      python --version
+                      pip install --upgrade pip
+                      pip install -r requirements.txt
+                    '''
+                }
+            }
         }
-      }
-    }
 
-    stage('Collect Static (optional)') {
-      steps {
-        container('python') {
-          sh 'python manage.py collectstatic --noinput || true'
+        stage('Migrate DB') {
+            steps {
+                container('python') {
+                    sh '''
+                      cd todoApp
+                      python manage.py migrate
+                    '''
+                }
+            }
         }
-      }
-    }
 
-  }
+        stage('Test') {
+            steps {
+                container('python') {
+                    sh '''
+                      cd todoApp
+                      python manage.py test || echo "No tests found"
+                    '''
+                }
+            }
+        }
 
-  post {
-    success {
-      echo "✅ Django CI pipeline completed successfully"
+        stage('Run App') {
+            steps {
+                container('python') {
+                    sh '''
+                      cd todoApp
+                      python manage.py runserver 0.0.0.0:8000 &
+                      sleep 5
+                    '''
+                }
+            }
+        }
     }
-    failure {
-      echo "❌ Pipeline failed"
-    }
-  }
 }
