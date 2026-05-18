@@ -12,7 +12,10 @@ class IndexView(generic.ListView):
         return Todo.objects.order_by('-created_at')
 
 def add(request):
-    title = request.POST['title']
+    title = request.POST.get('title', '').strip()
+    if not title:
+        # Redirect back with empty title handling
+        return redirect('todos:index')
     Todo.objects.create(title=title)
 
     return redirect('todos:index')
