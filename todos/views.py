@@ -12,7 +12,12 @@ class IndexView(generic.ListView):
         return Todo.objects.order_by('-created_at')
 
 def add(request):
-    title = request.POST['title']
+    """Add a new todo with title validation."""
+    title = request.POST.get('title', '').strip()
+    if not title:
+        return redirect('todos:index')
+    if len(title) > 100:
+        return redirect('todos:index')
     Todo.objects.create(title=title)
 
     return redirect('todos:index')
